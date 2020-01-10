@@ -36,6 +36,9 @@ program cans
   use mod_initmpi    , only: initmpi
   use mod_initsolver , only: initsolver
   use mod_load       , only: load
+#ifdef IBM
+  use mod_load       , only: read_psi
+#endif
   use mod_rk         , only: rk,rk_id
   use mod_output     , only: out0d,out1d,out1d_2,out2d,out3d
   use mod_param      , only: itot,jtot,ktot,lx,ly,lz,dx,dy,dz,dxi,dyi,dzi,uref,lref,rey,visc,small, &
@@ -201,6 +204,12 @@ program cans
   endif
   call bounduvw(cbcvel,n,bcvel,is_outflow,dl,dzc,dzf,u,v,w)
   call boundp(cbcpre,n,bcpre,dl,dzc,dzf,p)
+#ifdef IBM
+  call read_psi(trim(datadir)//'psi.bin',n,psi(1:n(1),1:n(2),1:n(3)))
+  call boundp(cbcpre,n,bcpre,dl,dzc,dzf,psi) ! NOTE: same BC as pressure for now
+#else
+  psi(:,:,:) = 0.
+#endif
   !
   ! post-process and write initial condition
   !
@@ -406,6 +415,11 @@ program cans
         call out0d(trim(datadir)//'forcing.out',7,var)
       endif
       !deallocate(var)
+#ifdef IBM
+      var(1)   = time
+      var(2:4) = fibmtot(1:3)
+      call out0d(trim(datadir)//'forcing_ibm.out',4,var)
+#endif
     endif
     write(fldnum,'(i7.7)') istep
     if(mod(istep,iout1d).eq.0) then

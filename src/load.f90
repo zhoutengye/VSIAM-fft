@@ -84,7 +84,6 @@ module mod_load
     ! reads a volume fraction field
     !
     implicit none
-    character(len=1)  , intent(in) :: io
     character(len=*), intent(in) :: filename
     integer , intent(in ), dimension(3) :: n
     real(rp), intent(out), dimension(:,:,:) :: psi
@@ -92,6 +91,7 @@ module mod_load
     integer(kind=MPI_OFFSET_KIND) :: filesize,disp,good
     integer(8), dimension(3) :: ng
     integer :: lenr
+    real(rp) :: dummy
     !
     call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, &
          MPI_MODE_RDONLY, MPI_INFO_NULL,fh, ierr)
@@ -101,7 +101,7 @@ module mod_load
     call MPI_FILE_GET_SIZE(fh,filesize,ierr)
     ng(:)   = n(:)
     ng(1:2) = ng(1:2)*dims(:)
-    lenr = sizeof(time)
+    lenr = sizeof(dummy)
     good = (product(ng)*1+0)*lenr
     if(filesize.ne.good) then
       if(myid.eq.0) print*, ''

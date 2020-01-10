@@ -3,7 +3,7 @@ module mod_forcing
   use mod_common_mpi, only: ierr
   implicit none
   private
-  public force_vel,force_bulk
+  public force_vel,force_bulk_vel
   contains
   subroutine force_vel(n,psi,u,v,w,f)
     !
@@ -61,7 +61,7 @@ module mod_forcing
     return
   end subroutine force_vel
   !
-  subroutine force_bulk(n,idir,psi,p,velf,f)
+  subroutine force_bulk_vel(n,idir,psi,p,velf,f)
     !
     ! bulk velocity forcing only in a region of the domain
     ! where psi is non-zero
@@ -123,5 +123,5 @@ module mod_forcing
     enddo
     !$OMP END PARALLEL DO
     return
-  end subroutine force_bulk
+  end subroutine force_bulk_vel
 end module mod_forcing

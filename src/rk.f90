@@ -4,7 +4,7 @@ module mod_rk
   use mod_mom  , only: momxad,momyad,momzad,momxp,momyp,momzp
   use mod_momd , only: momxpd,momypd,momzpd,momxa,momya,momza
   use mod_moms , only: momsad
-  use mod_forcing , only: force_vel
+  use mod_forcing , only: force_vel,force_bulk_vel
   use mod_types
   implicit none
   private
@@ -102,13 +102,13 @@ module mod_rk
     endif
 #else
     if(is_forced(1)) then
-      call force_bulk(n,1,psi,p,velf(1),f(1))
+      call force_bulk_vel(n,1,psi,up,velf(1),f(1))
     endif
     if(is_forced(2)) then
-      call force_bulk(n,2,psi,p,velf(2),f(2))
+      call force_bulk_vel(n,2,psi,vp,velf(2),f(2))
     endif
     if(is_forced(3)) then
-      call force_bulk(n,3,psi,p,velf(3),f(3))
+      call force_bulk_vel(n,3,psi,wp,velf(3),f(3))
     endif
 #endif
     return
@@ -205,13 +205,13 @@ module mod_rk
 #else
     f(:) = 0.
     if(is_forced(1)) then
-      call force_bulk(n,1,psi,p,velf(1),f(1))
+      call force_bulk_vel(n,1,psi,up,velf(1),f(1))
     endif
     if(is_forced(2)) then
-      call force_bulk(n,2,psi,p,velf(2),f(2))
+      call force_bulk_vel(n,2,psi,vp,velf(2),f(2))
     endif
     if(is_forced(3)) then
-      call force_bulk(n,3,psi,p,velf(3),f(3))
+      call force_bulk_vel(n,3,psi,wp,velf(3),f(3))
     endif
 #endif
     !

@@ -5,7 +5,7 @@ BIG := # -mcmodel=medium
 DBG := #-g -fbacktrace -Wall -O0 -Wextra -pedantic -fcheck=all
 OMP := #-openmp
 OPT := -O3
-OTH := -DDEBUG -DTIMING #-DIMPDIFF
+OTH := -DDEBUG -DTIMING -DIBM #-DIMPDIFF
 PROF := #-pg
 FFLAGS := $(OPT) $(BIG) $(DBG) $(PROF) $(OMP) $(OTH)
 TARGET = cans
