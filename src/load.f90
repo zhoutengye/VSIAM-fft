@@ -7,6 +7,9 @@ module mod_load
   implicit none
   private
   public load
+#ifdef IBM
+  public read_psi
+#endif
   contains
   subroutine load(io,filename,n,u,v,w,p,time,istep)
     !
@@ -75,4 +78,46 @@ module mod_load
     end select
     return
   end subroutine load
+#ifdef IBM
+  subroutine read_psi(filename,n,psi)
+    !
+    ! reads a volume fraction field
+    !
+    implicit none
+    character(len=1)  , intent(in) :: io
+    character(len=*), intent(in) :: filename
+    integer , intent(in ), dimension(3) :: n
+    real(rp), intent(out), dimension(:,:,:) :: psi
+    integer :: fh
+    integer(kind=MPI_OFFSET_KIND) :: filesize,disp,good
+    integer(8), dimension(3) :: ng
+    integer :: lenr
+    !
+    call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, &
+         MPI_MODE_RDONLY, MPI_INFO_NULL,fh, ierr)
+    !
+    ! check file size first
+    !
+    call MPI_FILE_GET_SIZE(fh,filesize,ierr)
+    ng(:)   = n(:)
+    ng(1:2) = ng(1:2)*dims(:)
+    lenr = sizeof(time)
+    good = (product(ng)*1+0)*lenr
+    if(filesize.ne.good) then
+      if(myid.eq.0) print*, ''
+      if(myid.eq.0) print*, '*** Simulation aborted due a checkpoint file with incorrect size ***'
+      if(myid.eq.0) print*, '    file: ', filename, ' | expected size: ', good, '| actual size: ', filesize
+      call decomp_2d_finalize
+      call MPI_FINALIZE(ierr)
+      call exit
+    endif
+    !
+    ! read
+    !
+    disp = 0_MPI_OFFSET_KIND
+    call decomp_2d_read_var(fh,disp,3,psi)
+    call MPI_FILE_CLOSE(fh,ierr)
+    return
+  end subroutine read_psi
+#endif
 end module mod_load
