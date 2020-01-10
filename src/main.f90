@@ -91,6 +91,12 @@ program cans
 #ifdef TIMING
   real(rp) :: dt12,dt12av,dt12min,dt12max
 #endif
+  !
+  ! IBM
+  !
+  real(rp), allocatable, dimension(:,:,:) :: psi
+  real(rp), dimension(3) :: fibm,fibmtot
+  !
   real(rp) :: twi,tw
   character(len=7) :: fldnum
   integer :: kk
@@ -119,6 +125,11 @@ program cans
            vp(0:n(1)+1,0:n(2)+1,0:n(3)+1), &
            wp(0:n(1)+1,0:n(2)+1,0:n(3)+1), &
            pp(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+#ifdef IBM
+  allocate(psi(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+#else
+  allocate(psi(0,0,0))
+#endif
   allocate(dudtrko(n(1),n(2),n(3)), &
            dvdtrko(n(1),n(2),n(3)), &
            dwdtrko(n(1),n(2),n(3)))
@@ -234,19 +245,24 @@ program cans
     tauxo(:) = 0.
     tauyo(:) = 0.
     tauzo(:) = 0.
+#ifdef IBM
+    fibmtot(:) = 0.
+#endif
     do irk=1,3
       dtrk = sum(rkcoeff(:,irk))*dt
       dtrki = dtrk**(-1)
 #ifndef IMPDIFF
       call rk(rkcoeff(:,irk),n,dli,dzci,dzfi,dzf/lz,dzc/lz,visc,dt,l, &
-                 u,v,w,p,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f)
+                 u,v,w,p,psi,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f,fibm)
 #else
       call rk_id(rkcoeff(:,irk),n,dli,dzci,dzfi,dzf/lz,dzc/lz,visc,dt,l, &
                  u,v,w,p,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f)
 #endif
+#ifndef IBM
       if(is_forced(1)) up(1:n(1),1:n(2),1:n(3)) = up(1:n(1),1:n(2),1:n(3)) + f(1)
       if(is_forced(2)) vp(1:n(1),1:n(2),1:n(3)) = vp(1:n(1),1:n(2),1:n(3)) + f(2)
       if(is_forced(3)) wp(1:n(1),1:n(2),1:n(3)) = wp(1:n(1),1:n(2),1:n(3)) + f(3)
+#endif
 #ifdef IMPDIFF
       alpha = -1./(.5*visc*dtrk)
       !$OMP WORKSHARE
@@ -269,6 +285,9 @@ program cans
       call solver(n,arrplanw,normfftw,lambdaxyw,aw,bb,cw,cbcvel(:,3,3),(/'c','c','f'/),wp)
 #endif
       dpdl(:) = dpdl(:) + f(:)
+#ifdef IBM
+      fibmtot(:) = fibmtot(:) + fibm(:)
+#endif
       call bounduvw(cbcvel,n,bcvel,no_outflow,dl,dzc,dzf,up,vp,wp) ! outflow BC only at final velocity
 #ifndef IMPDIFF
 #ifdef ONE_PRESS_CORR
@@ -321,6 +340,9 @@ program cans
       call boundp(cbcpre,n,bcpre,dl,dzc,dzf,p)
     enddo
     dpdl(:) = -dpdl(:)*dti
+#ifdef IBM
+    fibmtot(:) = fibmtot(:)*dti
+#endif
     !
     ! check simulation stopping criteria
     !
