@@ -31,6 +31,7 @@ program cans
   use mod_debug      , only: chkmean
   use mod_fft        , only: fftini,fftend
   use mod_fillps     , only: fillps
+  use mod_forcing    , only: chkmean_ibm
   use mod_initflow   , only: initflow
   use mod_initgrid   , only: initgrid
   use mod_initmpi    , only: initmpi
@@ -356,7 +357,7 @@ program cans
     ! check simulation stopping criteria
     !
     if(stop_type(1)) then ! maximum number of time steps reached
-      if(istep.ge.nstep-1 ) is_done = is_done.or..true.
+      if(istep.ge.nstep   ) is_done = is_done.or..true.
     endif
     if(stop_type(2)) then ! maximum simulation time reached
       if(time .ge.time_max) is_done = is_done.or..true.
@@ -399,6 +400,7 @@ program cans
         meanvelu = 0.
         meanvelv = 0.
         meanvelw = 0.
+#ifndef IBM
         if(is_forced(1).or.abs(bforce(1)).gt.0.) then
           call chkmean(n,dzf/lz,up,meanvelu)
         endif
@@ -408,6 +410,17 @@ program cans
         if(is_forced(3).or.abs(bforce(3)).gt.0.) then
           call chkmean(n,dzc/lz,wp,meanvelw)
         endif
+#else
+        if(is_forced(1).or.abs(bforce(1)).gt.0.) then
+          call chkmean_ibm(n,1,dl,dzc,dzf,l,psi,u,meanvelu)
+        endif
+        if(is_forced(2).or.abs(bforce(2)).gt.0.) then
+          call chkmean_ibm(n,2,dl,dzc,dzf,l,psi,v,meanvelv)
+        endif
+        if(is_forced(3).or.abs(bforce(3)).gt.0.) then
+          call chkmean_ibm(n,3,dl,dzc,dzf,l,psi,w,meanvelw)
+        endif
+#endif
         if(.not.any(is_forced(:))) dpdl(:) = -bforce(:) ! constant pressure gradient
         var(1)   = time
         var(2:4) = dpdl(1:3)
