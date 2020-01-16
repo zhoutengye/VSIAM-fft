@@ -5,7 +5,7 @@ module mod_forcing
   private
   public force_vel,force_bulk_vel,chkmean_ibm
   contains
-  subroutine force_vel(n,dl,dzc,dzf,l,psi,u,v,w,f)
+  subroutine force_vel(n,dl,dzc,dzf,l,psi_u,psi_v,psi_w,u,v,w,f)
     !
     ! force velocity field using the volume-penalisation IBM:
     ! the force is proportional to the volume fraction of
@@ -22,28 +22,32 @@ module mod_forcing
     integer , intent(in), dimension(3) :: n
     real(rp), intent(in   ) , dimension(3) :: dl,l
     real(rp), intent(in   ) , dimension(0:) :: dzc,dzf
-    real(rp), intent(in   ) , dimension(0:,0:,0:) :: psi
+    real(rp), intent(in   ) , dimension(0:,0:,0:) :: psi_u,psi_v,psi_w
     real(rp), intent(inout) , dimension(0:,0:,0:) :: u,v,w
     real(rp), intent(inout), dimension(3) :: f
     real(rp) :: psix,psiy,psiz,fx,fy,fz,fxtot,fytot,fztot
-    integer :: i,j,k,ip,jp,kp
+    integer :: i,j,k!,ip,jp,kp
     !
     fxtot = 0.
     fytot = 0.
     fztot = 0.
     !$OMP PARALLEL DO DEFAULT(none) &
-    !$OMP SHARED(n,u,v,w,psi,dl,dzc,dzf) &
-    !$OMP PRIVATE(i,j,k,ip,jp,kp,fx,fy,fz,psix,psiy,psiz) &
+    !$OMP SHARED(n,u,v,w,psi_u,psi_v,psi_w,dl,dzc,dzf) &
+    !$OMP PRIVATE(i,j,k,fx,fy,fz,psix,psiy,psiz) &
     !$OMP REDUCTION(+:fxtot,fytot,fztot)
     do k=1,n(3)
-      kp = k+1
+      !kp = k+1
       do j=1,n(2)
-        jp = j+1
+        !jp = j+1
         do i=1,n(1)
-          ip = i+1
-          psix  = 0.5*(psi(ip,j ,k )+psi(i,j,k)) ! liquid volume fraction
-          psiy  = 0.5*(psi(i ,jp,k )+psi(i,j,k)) ! liquid volume fraction
-          psiz  = 0.5*(psi(i ,j ,kp)+psi(i,j,k)) ! liquid volume fraction
+          !ip = i+1
+          !
+          ! note: these loops should be splitted into three for more efficient
+          !       memory access
+          !
+          psix  = psi_u(i,j,k)!0.5*(psi(ip,j ,k )+psi(i,j,k)) ! liquid volume fraction
+          psiy  = psi_v(i,j,k)!0.5*(psi(i ,jp,k )+psi(i,j,k)) ! liquid volume fraction
+          psiz  = psi_w(i,j,k)!0.5*(psi(i ,j ,kp)+psi(i,j,k)) ! liquid volume fraction
           fx    = - u(i,j,k)*psix ! (u(i,j,k)*(1.-psix)-u(i,j,k))*dti
           fy    = - v(i,j,k)*psiy ! (v(i,j,k)*(1.-psiy)-v(i,j,k))*dti
           fz    = - w(i,j,k)*psiz ! (w(i,j,k)*(1.-psiz)-w(i,j,k))*dti
@@ -107,7 +111,8 @@ module mod_forcing
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
-          psis = 1.-0.5*(psi(i,j,k)+psi(i+q(1),j+q(2),k+q(3)))
+          !psis = 1.-0.5*(psi(i,j,k)+psi(i+q(1),j+q(2),k+q(3)))
+          psis = 1.-psi(i,j,k) ! psi already shifted according to staggered position
           mean_val = mean_val + p(i,j,k)*psis*dl(1)*dl(2)*dz(k)
           mean_psi = mean_psi + psis*dl(1)*dl(2)*dz(k)
         enddo
@@ -177,7 +182,8 @@ module mod_forcing
     do k=1,n(3)
       do j=1,n(2)
         do i=1,n(1)
-          psis = 1.-0.5*(psi(i,j,k)+psi(i+q(1),j+q(2),k+q(3)))
+          !psis = 1.-0.5*(psi(i,j,k)+psi(i+q(1),j+q(2),k+q(3)))
+          psis = 1.-psi(i,j,k)
           mean_val = mean_val + p(i,j,k)*psis*dl(1)*dl(2)*dz(k)
           mean_psi = mean_psi + psis*dl(1)*dl(2)*dz(k)
         enddo

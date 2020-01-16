@@ -98,7 +98,8 @@ program cans
   !
   ! IBM
   !
-  real(rp), allocatable, dimension(:,:,:) :: psi
+  !real(rp), allocatable, dimension(:,:,:) :: psi
+  real(rp), allocatable, dimension(:,:,:) :: psi_u,psi_v,psi_w
   real(rp), dimension(3) :: fibm,fibmtot
   !
   real(rp) :: twi,tw
@@ -130,9 +131,15 @@ program cans
            wp(0:n(1)+1,0:n(2)+1,0:n(3)+1), &
            pp(0:n(1)+1,0:n(2)+1,0:n(3)+1))
 #ifdef IBM
-  allocate(psi(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+  !allocate(psi(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+  allocate(psi_u(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+  allocate(psi_v(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+  allocate(psi_w(0:n(1)+1,0:n(2)+1,0:n(3)+1))
 #else
-  allocate(psi(0,0,0))
+  !allocate(psi(0,0,0))
+  allocate(psi_u(0,0,0))
+  allocate(psi_v(0,0,0))
+  allocate(psi_w(0,0,0))
 #endif
   allocate(dudtrko(n(1),n(2),n(3)), &
            dvdtrko(n(1),n(2),n(3)), &
@@ -206,8 +213,14 @@ program cans
   call bounduvw(cbcvel,n,bcvel,is_outflow,dl,dzc,dzf,u,v,w)
   call boundp(cbcpre,n,bcpre,dl,dzc,dzf,p)
 #ifdef IBM
-  call read_psi(trim(datadir)//'psi.bin',n,psi(1:n(1),1:n(2),1:n(3)))
-  call boundp(cbcpre,n,bcpre,dl,dzc,dzf,psi) ! NOTE: same BC as pressure for now
+  !call read_psi(trim(datadir)//'psi.bin',n,psi(1:n(1),1:n(2),1:n(3)))
+  !call boundp(cbcpre,n,bcpre,dl,dzc,dzf,psi) ! NOTE: same BC as pressure for now
+  call read_psi(trim(datadir)//'psi_u.bin',n,psi_u(1:n(1),1:n(2),1:n(3)))
+  call read_psi(trim(datadir)//'psi_v.bin',n,psi_v(1:n(1),1:n(2),1:n(3)))
+  call read_psi(trim(datadir)//'psi_w.bin',n,psi_w(1:n(1),1:n(2),1:n(3)))
+  call boundp(cbcpre,n,bcpre,dl,dzc,dzf,psi_u) ! NOTE: now that the volume fractions are staggered, no need for BC 
+  call boundp(cbcpre,n,bcpre,dl,dzc,dzf,psi_v) ! NOTE: now that the volume fractions are staggered, no need for BC
+  call boundp(cbcpre,n,bcpre,dl,dzc,dzf,psi_w) ! NOTE: now that the volume fractions are staggered, no need for BC
 #else
   psi(:,:,:) = 0.
 #endif
@@ -263,10 +276,10 @@ program cans
       dtrki = dtrk**(-1)
 #ifndef IMPDIFF
       call rk(rkcoeff(:,irk),n,dli,dzci,dzfi,dzf/lz,dzc/lz,visc,dt,l, &
-                 u,v,w,p,psi,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f,fibm)
+                 u,v,w,p,psi_u,psi_v,psi_w,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f,fibm)
 #else
       call rk_id(rkcoeff(:,irk),n,dli,dzci,dzfi,dzf/lz,dzc/lz,visc,dt,l, &
-                 u,v,w,p,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f)
+                 u,v,w,p,psi_u,psi_v,psi_w,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f,fibm)
 #endif
 #ifndef IBM
       if(is_forced(1)) up(1:n(1),1:n(2),1:n(3)) = up(1:n(1),1:n(2),1:n(3)) + f(1)
@@ -412,13 +425,13 @@ program cans
         endif
 #else
         if(is_forced(1).or.abs(bforce(1)).gt.0.) then
-          call chkmean_ibm(n,1,dl,dzc,dzf,l,psi,u,meanvelu)
+          call chkmean_ibm(n,1,dl,dzc,dzf,l,psi_u,u,meanvelu)
         endif
         if(is_forced(2).or.abs(bforce(2)).gt.0.) then
-          call chkmean_ibm(n,2,dl,dzc,dzf,l,psi,v,meanvelv)
+          call chkmean_ibm(n,2,dl,dzc,dzf,l,psi_v,v,meanvelv)
         endif
         if(is_forced(3).or.abs(bforce(3)).gt.0.) then
-          call chkmean_ibm(n,3,dl,dzc,dzf,l,psi,w,meanvelw)
+          call chkmean_ibm(n,3,dl,dzc,dzf,l,psi_w,w,meanvelw)
         endif
 #endif
         if(.not.any(is_forced(:))) dpdl(:) = -bforce(:) ! constant pressure gradient

@@ -10,7 +10,7 @@ module mod_rk
   private
   public rk,rk_id
   contains
-  subroutine rk(rkpar,n,dli,dzci,dzfi,dzflzi,dzclzi,visc,dt,l,u,v,w,p,psi, &
+  subroutine rk(rkpar,n,dli,dzci,dzfi,dzflzi,dzclzi,visc,dt,l,u,v,w,p,psi_u,psi_v,psi_w, &
                 dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f,fibm)
     !
     ! low-storage 3rd-order Runge-Kutta scheme 
@@ -23,7 +23,7 @@ module mod_rk
     real(rp), intent(in   ), dimension(3) :: dli,l 
     real(rp), intent(in   ), dimension(0:) :: dzci,dzfi,dzflzi,dzclzi
     real(rp), intent(in   ), dimension(0:,0:,0:) :: u ,v ,w,p
-    real(rp), intent(in   ), dimension(0:,0:,0:) :: psi
+    real(rp), intent(in   ), dimension(0:,0:,0:) :: psi_u,psi_v,psi_w
     real(rp), intent(inout), dimension(:,:,:) :: dudtrko,dvdtrko,dwdtrko
     real(rp), intent(inout), dimension(3) :: tauxo,tauyo,tauzo
     real(rp), intent(out), dimension(0:,0:,0:) :: up,vp,wp
@@ -99,24 +99,24 @@ module mod_rk
     endif
 #else
     if(is_forced(1)) then
-      call force_bulk_vel(n,1,dli**(-1),dzci**(-1),dzfi**(-1),l,psi,up,velf(1),f(1))
+      call force_bulk_vel(n,1,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_u,up,velf(1),f(1))
     endif
     if(is_forced(2)) then
-      call force_bulk_vel(n,2,dli**(-1),dzci**(-1),dzfi**(-1),l,psi,vp,velf(2),f(2))
+      call force_bulk_vel(n,2,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_v,vp,velf(2),f(2))
     endif
     if(is_forced(3)) then
-      call force_bulk_vel(n,3,dli**(-1),dzci**(-1),dzfi**(-1),l,psi,wp,velf(3),f(3))
+      call force_bulk_vel(n,3,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_w,wp,velf(3),f(3))
     endif
 #endif
 #ifdef IBM
     !
     ! IBM forcing
     !
-  call force_vel(n,dli**(-1),dzci**(-1),dzfi**(-1),l,psi,up,vp,wp,fibm)
+  call force_vel(n,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_u,psi_v,psi_w,up,vp,wp,fibm)
 #endif
     return
   end subroutine rk
-  subroutine rk_id(rkpar,n,dli,dzci,dzfi,dzflzi,dzclzi,visc,dt,l,u,v,w,p,psi, &
+  subroutine rk_id(rkpar,n,dli,dzci,dzfi,dzflzi,dzclzi,visc,dt,l,u,v,w,p,psi_u,psi_v,psi_w, &
                    dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f,fibm)
     !
     ! low-storage 3rd-order Runge-Kutta scheme 
@@ -129,7 +129,7 @@ module mod_rk
     real(rp), intent(in   ), dimension(3) :: dli,l 
     real(rp), intent(in   ), dimension(0:) :: dzci,dzfi,dzflzi,dzclzi
     real(rp), intent(in   ), dimension(0:,0:,0:) :: u ,v ,w,p
-    real(rp), intent(in   ), dimension(0:,0:,0:) :: psi
+    real(rp), intent(in   ), dimension(0:,0:,0:) :: psi_u,psi_v,psi_w
     real(rp), intent(inout), dimension(:,:,:) :: dudtrko,dvdtrko,dwdtrko
     real(rp), intent(inout), dimension(3) :: tauxo,tauyo,tauzo
     real(rp), intent(out), dimension(0:,0:,0:) :: up,vp,wp
@@ -204,20 +204,20 @@ module mod_rk
     endif
 #else
     if(is_forced(1)) then
-      call force_bulk_vel(n,1,dli**(-1),dzci**(-1),dzfi**(-1),l,psi,up,velf(1),f(1))
+      call force_bulk_vel(n,1,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_u,up,velf(1),f(1))
     endif
     if(is_forced(2)) then
-      call force_bulk_vel(n,2,dli**(-1),dzci**(-1),dzfi**(-1),l,psi,vp,velf(2),f(2))
+      call force_bulk_vel(n,2,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_v,vp,velf(2),f(2))
     endif
     if(is_forced(3)) then
-      call force_bulk_vel(n,3,dli**(-1),dzci**(-1),dzfi**(-1),l,psi,wp,velf(3),f(3))
+      call force_bulk_vel(n,3,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_w,wp,velf(3),f(3))
     endif
 #endif
 #ifdef IBM
     !
     ! IBM forcing
     !
-  call force_vel(n,dli**(-1),dzci**(-1),dzfi**(-1),l,psi,up,vp,wp,fibm)
+  call force_vel(n,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_u,psi_v,psi_w,up,vp,wp,fibm)
 #endif
     !
     ! compute rhs of helmholtz equation
