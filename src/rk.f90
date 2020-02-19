@@ -4,12 +4,14 @@ module mod_rk
   use mod_mom  , only: momxad,momyad,momzad,momxp,momyp,momzp
   use mod_momd , only: momxpd,momypd,momzpd,momxa,momya,momza
   use mod_moms , only: momsad
+  use mod_forcing , only: force_vel,force_bulk_vel
   use mod_types
   implicit none
   private
   public rk,rk_id
   contains
-  subroutine rk(rkpar,n,dli,dzci,dzfi,dzflzi,dzclzi,visc,dt,l,u,v,w,p,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f)
+  subroutine rk(rkpar,n,dli,dzci,dzfi,dzflzi,dzclzi,visc,dt,l,u,v,w,p,psi_u,psi_v,psi_w, &
+                dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f,fibm)
     !
     ! low-storage 3rd-order Runge-Kutta scheme 
     ! for time integration of the momentum equations.
@@ -21,10 +23,11 @@ module mod_rk
     real(rp), intent(in   ), dimension(3) :: dli,l 
     real(rp), intent(in   ), dimension(0:) :: dzci,dzfi,dzflzi,dzclzi
     real(rp), intent(in   ), dimension(0:,0:,0:) :: u ,v ,w,p
+    real(rp), intent(in   ), dimension(0:,0:,0:) :: psi_u,psi_v,psi_w
     real(rp), intent(inout), dimension(:,:,:) :: dudtrko,dvdtrko,dwdtrko
     real(rp), intent(inout), dimension(3) :: tauxo,tauyo,tauzo
     real(rp), intent(out), dimension(0:,0:,0:) :: up,vp,wp
-    real(rp), intent(out), dimension(3) :: f
+    real(rp), intent(out), dimension(3) :: f,fibm
     real(rp),              dimension(n(1),n(2),n(3)) :: dudtrk,dvdtrk,dwdtrk
     real(rp) :: factor1,factor2,factor12
     real(rp), dimension(3) :: taux,tauy,tauz
@@ -81,6 +84,7 @@ module mod_rk
     ! bulk velocity forcing
     !
     f(:) = 0.
+#ifndef IBM
     if(is_forced(1)) then
       call chkmean(n,dzflzi,up,mean)
       f(1) = velf(1) - mean
@@ -93,9 +97,27 @@ module mod_rk
       call chkmean(n,dzclzi,wp,mean)
       f(3) = velf(3) - mean
     endif
+#else
+    if(is_forced(1)) then
+      call force_bulk_vel(n,1,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_u,up,velf(1),f(1))
+    endif
+    if(is_forced(2)) then
+      call force_bulk_vel(n,2,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_v,vp,velf(2),f(2))
+    endif
+    if(is_forced(3)) then
+      call force_bulk_vel(n,3,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_w,wp,velf(3),f(3))
+    endif
+#endif
+#ifdef IBM
+    !
+    ! IBM forcing
+    !
+  call force_vel(n,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_u,psi_v,psi_w,up,vp,wp,fibm)
+#endif
     return
   end subroutine rk
-  subroutine rk_id(rkpar,n,dli,dzci,dzfi,dzflzi,dzclzi,visc,dt,l,u,v,w,p,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f)
+  subroutine rk_id(rkpar,n,dli,dzci,dzfi,dzflzi,dzclzi,visc,dt,l,u,v,w,p,psi_u,psi_v,psi_w, &
+                   dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f,fibm)
     !
     ! low-storage 3rd-order Runge-Kutta scheme 
     ! for time integration of the momentum equations with implicit diffusion.
@@ -107,10 +129,11 @@ module mod_rk
     real(rp), intent(in   ), dimension(3) :: dli,l 
     real(rp), intent(in   ), dimension(0:) :: dzci,dzfi,dzflzi,dzclzi
     real(rp), intent(in   ), dimension(0:,0:,0:) :: u ,v ,w,p
+    real(rp), intent(in   ), dimension(0:,0:,0:) :: psi_u,psi_v,psi_w
     real(rp), intent(inout), dimension(:,:,:) :: dudtrko,dvdtrko,dwdtrko
     real(rp), intent(inout), dimension(3) :: tauxo,tauyo,tauzo
     real(rp), intent(out), dimension(0:,0:,0:) :: up,vp,wp
-    real(rp), intent(out), dimension(3) :: f
+    real(rp), intent(out), dimension(3) :: f,fibm
     real(rp),              dimension(n(1),n(2),n(3)) :: dudtrk , dvdtrk , dwdtrk
     real(rp),              dimension(n(1),n(2),n(3)) :: dudtrkd, dvdtrkd, dwdtrkd
     real(rp) :: factor1,factor2,factor12
@@ -166,6 +189,7 @@ module mod_rk
     ! bulk velocity forcing
     !
     f(:) = 0.
+#ifndef IBM
     if(is_forced(1)) then
       call chkmean(n,dzflzi,up,mean)
       f(1) = velf(1) - mean
@@ -178,6 +202,23 @@ module mod_rk
       call chkmean(n,dzclzi,wp,mean)
       f(3) = velf(3) - mean
     endif
+#else
+    if(is_forced(1)) then
+      call force_bulk_vel(n,1,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_u,up,velf(1),f(1))
+    endif
+    if(is_forced(2)) then
+      call force_bulk_vel(n,2,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_v,vp,velf(2),f(2))
+    endif
+    if(is_forced(3)) then
+      call force_bulk_vel(n,3,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_w,wp,velf(3),f(3))
+    endif
+#endif
+#ifdef IBM
+    !
+    ! IBM forcing
+    !
+  call force_vel(n,dli**(-1),dzci**(-1),dzfi**(-1),l,psi_u,psi_v,psi_w,up,vp,wp,fibm)
+#endif
     !
     ! compute rhs of helmholtz equation
     !

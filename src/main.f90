@@ -31,11 +31,15 @@ program cans
   use mod_debug      , only: chkmean
   use mod_fft        , only: fftini,fftend
   use mod_fillps     , only: fillps
+  use mod_forcing    , only: chkmean_ibm
   use mod_initflow   , only: initflow
   use mod_initgrid   , only: initgrid
   use mod_initmpi    , only: initmpi
   use mod_initsolver , only: initsolver
   use mod_load       , only: load
+#ifdef IBM
+  use mod_load       , only: read_psi
+#endif
   use mod_rk         , only: rk,rk_id
   use mod_output     , only: out0d,out1d,out1d_2,out2d,out3d
   use mod_param      , only: itot,jtot,ktot,lx,ly,lz,dx,dy,dz,dxi,dyi,dzi,uref,lref,rey,visc,small, &
@@ -91,6 +95,13 @@ program cans
 #ifdef TIMING
   real(rp) :: dt12,dt12av,dt12min,dt12max
 #endif
+  !
+  ! IBM
+  !
+  !real(rp), allocatable, dimension(:,:,:) :: psi
+  real(rp), allocatable, dimension(:,:,:) :: psi_u,psi_v,psi_w
+  real(rp), dimension(3) :: fibm,fibmtot
+  !
   real(rp) :: twi,tw
   character(len=7) :: fldnum
   integer :: kk
@@ -119,6 +130,17 @@ program cans
            vp(0:n(1)+1,0:n(2)+1,0:n(3)+1), &
            wp(0:n(1)+1,0:n(2)+1,0:n(3)+1), &
            pp(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+#ifdef IBM
+  !allocate(psi(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+  allocate(psi_u(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+  allocate(psi_v(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+  allocate(psi_w(0:n(1)+1,0:n(2)+1,0:n(3)+1))
+#else
+  !allocate(psi(0,0,0))
+  allocate(psi_u(0,0,0))
+  allocate(psi_v(0,0,0))
+  allocate(psi_w(0,0,0))
+#endif
   allocate(dudtrko(n(1),n(2),n(3)), &
            dvdtrko(n(1),n(2),n(3)), &
            dwdtrko(n(1),n(2),n(3)))
@@ -190,6 +212,18 @@ program cans
   endif
   call bounduvw(cbcvel,n,bcvel,is_outflow,dl,dzc,dzf,u,v,w)
   call boundp(cbcpre,n,bcpre,dl,dzc,dzf,p)
+#ifdef IBM
+  !call read_psi(trim(datadir)//'psi.bin',n,psi(1:n(1),1:n(2),1:n(3)))
+  !call boundp(cbcpre,n,bcpre,dl,dzc,dzf,psi) ! NOTE: same BC as pressure for now
+  call read_psi(trim(datadir)//'psi_u.bin',n,psi_u(1:n(1),1:n(2),1:n(3)))
+  call read_psi(trim(datadir)//'psi_v.bin',n,psi_v(1:n(1),1:n(2),1:n(3)))
+  call read_psi(trim(datadir)//'psi_w.bin',n,psi_w(1:n(1),1:n(2),1:n(3)))
+  call boundp(cbcpre,n,bcpre,dl,dzc,dzf,psi_u) ! NOTE: now that the volume fractions are staggered, no need for BC 
+  call boundp(cbcpre,n,bcpre,dl,dzc,dzf,psi_v) ! NOTE: now that the volume fractions are staggered, no need for BC
+  call boundp(cbcpre,n,bcpre,dl,dzc,dzf,psi_w) ! NOTE: now that the volume fractions are staggered, no need for BC
+#else
+  psi(:,:,:) = 0.
+#endif
   !
   ! post-process and write initial condition
   !
@@ -234,19 +268,24 @@ program cans
     tauxo(:) = 0.
     tauyo(:) = 0.
     tauzo(:) = 0.
+#ifdef IBM
+    fibmtot(:) = 0.
+#endif
     do irk=1,3
       dtrk = sum(rkcoeff(:,irk))*dt
       dtrki = dtrk**(-1)
 #ifndef IMPDIFF
       call rk(rkcoeff(:,irk),n,dli,dzci,dzfi,dzf/lz,dzc/lz,visc,dt,l, &
-                 u,v,w,p,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f)
+                 u,v,w,p,psi_u,psi_v,psi_w,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f,fibm)
 #else
       call rk_id(rkcoeff(:,irk),n,dli,dzci,dzfi,dzf/lz,dzc/lz,visc,dt,l, &
-                 u,v,w,p,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f)
+                 u,v,w,p,psi_u,psi_v,psi_w,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f,fibm)
 #endif
+#ifndef IBM
       if(is_forced(1)) up(1:n(1),1:n(2),1:n(3)) = up(1:n(1),1:n(2),1:n(3)) + f(1)
       if(is_forced(2)) vp(1:n(1),1:n(2),1:n(3)) = vp(1:n(1),1:n(2),1:n(3)) + f(2)
       if(is_forced(3)) wp(1:n(1),1:n(2),1:n(3)) = wp(1:n(1),1:n(2),1:n(3)) + f(3)
+#endif
 #ifdef IMPDIFF
       alpha = -1./(.5*visc*dtrk)
       !$OMP WORKSHARE
@@ -269,6 +308,9 @@ program cans
       call solver(n,arrplanw,normfftw,lambdaxyw,aw,bb,cw,cbcvel(:,3,3),(/'c','c','f'/),wp)
 #endif
       dpdl(:) = dpdl(:) + f(:)
+#ifdef IBM
+      fibmtot(:) = fibmtot(:) + fibm(:)
+#endif
       call bounduvw(cbcvel,n,bcvel,no_outflow,dl,dzc,dzf,up,vp,wp) ! outflow BC only at final velocity
 #ifndef IMPDIFF
 #ifdef ONE_PRESS_CORR
@@ -321,6 +363,9 @@ program cans
       call boundp(cbcpre,n,bcpre,dl,dzc,dzf,p)
     enddo
     dpdl(:) = -dpdl(:)*dti
+#ifdef IBM
+    fibmtot(:) = fibmtot(:)*dti
+#endif
     !
     ! check simulation stopping criteria
     !
@@ -368,6 +413,7 @@ program cans
         meanvelu = 0.
         meanvelv = 0.
         meanvelw = 0.
+#ifndef IBM
         if(is_forced(1).or.abs(bforce(1)).gt.0.) then
           call chkmean(n,dzf/lz,up,meanvelu)
         endif
@@ -377,6 +423,17 @@ program cans
         if(is_forced(3).or.abs(bforce(3)).gt.0.) then
           call chkmean(n,dzc/lz,wp,meanvelw)
         endif
+#else
+        if(is_forced(1).or.abs(bforce(1)).gt.0.) then
+          call chkmean_ibm(n,1,dl,dzc,dzf,l,psi_u,u,meanvelu)
+        endif
+        if(is_forced(2).or.abs(bforce(2)).gt.0.) then
+          call chkmean_ibm(n,2,dl,dzc,dzf,l,psi_v,v,meanvelv)
+        endif
+        if(is_forced(3).or.abs(bforce(3)).gt.0.) then
+          call chkmean_ibm(n,3,dl,dzc,dzf,l,psi_w,w,meanvelw)
+        endif
+#endif
         if(.not.any(is_forced(:))) dpdl(:) = -bforce(:) ! constant pressure gradient
         var(1)   = time
         var(2:4) = dpdl(1:3)
@@ -384,6 +441,11 @@ program cans
         call out0d(trim(datadir)//'forcing.out',7,var)
       endif
       !deallocate(var)
+#ifdef IBM
+      var(1)   = time
+      var(2:4) = fibmtot(1:3)
+      call out0d(trim(datadir)//'forcing_ibm.out',4,var)
+#endif
     endif
     write(fldnum,'(i7.7)') istep
     if(mod(istep,iout1d).eq.0) then

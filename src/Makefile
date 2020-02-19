@@ -5,12 +5,12 @@ BIG := # -mcmodel=medium
 DBG := #-g -fbacktrace -Wall -O0 -Wextra -pedantic -fcheck=all
 OMP := #-openmp
 OPT := -O3
-OTH := -DDEBUG -DTIMING #-DIMPDIFF
+OTH := -DDEBUG -DTIMING -DIBM #-DIMPDIFF
 PROF := #-pg
 FFLAGS := $(OPT) $(BIG) $(DBG) $(PROF) $(OMP) $(OTH)
 TARGET = cans
 #
-OBJ = bound.o chkdiv.o chkdt.o common_mpi.o correc.o debug.o fft.o fftw.o fillps.o initflow.o initgrid.o initmpi.o initsolver.o load.o main.o mom.o momd.o moms.o output.o param.o rk.o sanity.o solver.o decomp_2d.o io.o types.o
+OBJ = bound.o chkdiv.o chkdt.o common_mpi.o correc.o debug.o fft.o fftw.o fillps.o forcing.o initflow.o initgrid.o initmpi.o initsolver.o load.o main.o mom.o momd.o moms.o output.o param.o rk.o sanity.o solver.o decomp_2d.o io.o types.o
 #
 LIBS = -lfftw3 -lfftw3_threads
 #
@@ -50,6 +50,8 @@ fillps.o: fillps.f90 types.o
 fft.o: fft.f90 common_mpi.o fftw.o types.o
 	$(FC) $(FFLAGS) -cpp -c  $<
 fftw.o: fftw.f90
+	$(FC) $(FFLAGS) -cpp -c  $<
+forcing.o: forcing.f90 common_mpi.o types.o
 	$(FC) $(FFLAGS) -cpp -c  $<
 initflow.o: initflow.f90 common_mpi.o decomp_2d.o types.o
 	$(FC) $(FFLAGS) -cpp -c  $<
