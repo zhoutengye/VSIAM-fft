@@ -141,7 +141,7 @@ module mod_forcing
     !$OMP END PARALLEL DO
     call mpi_allreduce(MPI_IN_PLACE,f,1,MPI_REAL_RP,MPI_SUM,MPI_COMM_WORLD,ierr)
     f = f/(l(1)*l(2)*l(3))
-    !f = f/(l(1)*l(2)*l(3)-mean_psi) ! (if bulk velocity forced only inside the fluid)
+    !f = f/mean_psi ! (if bulk velocity forced only inside the fluid)
     return
   end subroutine force_bulk_vel
   subroutine chkmean_ibm(n,idir,dl,dzc,dzf,l,psi,p,mean)
