@@ -172,6 +172,7 @@ module mod_forcing
       dz(:) = dzf(1:n(3))
     case(2)
       q = (/0,1,0/)
+      dz(:) = dzf(1:n(3))
     case(3)
       q = (/0,0,1/)
       dz(:) = dzc(1:n(3))
