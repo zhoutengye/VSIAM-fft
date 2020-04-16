@@ -6,6 +6,7 @@ DBG := #-g -fbacktrace -Wall -O0 -Wextra -pedantic -fcheck=all
 OMP := #-openmp
 OPT := -O3
 OTH := -DDEBUG -DTIMING #-DIMPDIFF
+# OTH :=  -DTIMING -DNORK
 PROF := #-pg
 FFLAGS := $(OPT) $(BIG) $(DBG) $(PROF) $(OMP) $(OTH)
 TARGET = cans
