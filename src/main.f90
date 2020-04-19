@@ -36,7 +36,7 @@ program cans
   use mod_initmpi    , only: initmpi
   use mod_initsolver , only: initsolver
   use mod_load       , only: load
-  use mod_rk         , only: rk,rk_id
+  use mod_rk
   use mod_output     , only: out0d,out1d,out1d_2,out2d,out3d
   use mod_param      , only: itot,jtot,ktot,lx,ly,lz,dx,dy,dz,dxi,dyi,dzi,uref,lref,rey,visc,small, &
                              cbcvel,bcvel,cbcpre,bcpre, &
@@ -86,6 +86,8 @@ program cans
   character(len=7) :: fldnum
   integer :: kk
   logical :: is_done,kill
+
+  real(rp) :: c_time1, c_time2
   !
   call MPI_INIT(ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD, myid, ierr)
@@ -161,6 +163,9 @@ program cans
     istep = nint(ristep)
     if(myid.eq.0) print*, '*** Checkpoint loaded at time = ', time, 'time step = ', istep, '. ***'
   endif
+# if defined(VSIAM)
+  Call Fake_VSIAM_init(n,dli)
+# endif
   call bounduvw(cbcvel,n,bcvel,is_outflow,dl,dzc,dzf,u,v,w)
   call boundp(cbcpre,n,bcpre,dl,dzc,dzf,p)
   !
@@ -186,6 +191,7 @@ program cans
   !
   ! main loop
   !
+  call cpu_time(c_time1)
   if(myid.eq.0) print*, '*** Calculation loop starts now ***'
   is_done = .false.
   do while(.not.is_done)
@@ -200,29 +206,29 @@ program cans
     tauyo(:) = 0.
     tauzo(:) = 0.
 
-# if defined (VSIAM)
-    Call VSIAM_RHS()
-    if(is_forced(1)) up(1:n(1),1:n(2),1:n(3)) = up(1:n(1),1:n(2),1:n(3)) + f(1)
-    if(is_forced(2)) vp(1:n(1),1:n(2),1:n(3)) = vp(1:n(1),1:n(2),1:n(3)) + f(2)
-    if(is_forced(3)) wp(1:n(1),1:n(2),1:n(3)) = wp(1:n(1),1:n(2),1:n(3)) + f(3)
-    dpdl(:) = dpdl(:) + f(:)
-    call bounduvw(cbcvel,n,bcvel,no_outflow,dl,dzc,dzf,up,vp,wp) ! outflow BC only at final velocity
-    call fillps(n,dli,dzfi,dtrki,up,vp,wp,pp)
-    call updt_rhs_b((/'c','c','c'/),cbcpre,n,rhsbp%x,rhsbp%y,rhsbp%z,pp)
-    call solver(n,arrplanp,normfftp,lambdaxyp,ap,bp,cp,cbcpre(:,3),(/'c','c','c'/),pp)
-    call boundp(cbcpre,n,bcpre,dl,dzc,dzf,pp)
-    call correc(n,dli,dzci,dtrk,pp,up,vp,wp,u,v,w)
-    call bounduvw(cbcvel,n,bcvel,is_outflow,dl,dzc,dzf,u,v,w)
-    p(1:n(1),1:n(2),1:n(3)) = p(1:n(1),1:n(2),1:n(3)) + pp(1:n(1),1:n(2),1:n(3))
-    call boundp(cbcpre,n,bcpre,dl,dzc,dzf,p)
-# elif defined(NORK)
+#if defined(NORK)
     do irk=1,1
+#else
     do irk=1,3
 #endif
       dtrk = sum(rkcoeff(:,irk))*dt
       dtrki = dtrk**(-1)
+# if defined (VSIAM)
+      call Fake_VSIAM(rkcoeff(:,irk),n,dli,dzci,dzfi,dzf/lz,dzc/lz,visc,dt,l, &
+          u,v,w,p,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f)
+      call boundp(cbcpre,n,bcpre,dl,dzc,dzf,ux)
+      call boundp(cbcpre,n,bcpre,dl,dzc,dzf,uy)
+      call boundp(cbcpre,n,bcpre,dl,dzc,dzf,uz)
+      call boundp(cbcpre,n,bcpre,dl,dzc,dzf,vx)
+      call boundp(cbcpre,n,bcpre,dl,dzc,dzf,vy)
+      call boundp(cbcpre,n,bcpre,dl,dzc,dzf,vz)
+      call boundp(cbcpre,n,bcpre,dl,dzc,dzf,wx)
+      call boundp(cbcpre,n,bcpre,dl,dzc,dzf,wy)
+      call boundp(cbcpre,n,bcpre,dl,dzc,dzf,wz)
+# else
       call rk(rkcoeff(:,irk),n,dli,dzci,dzfi,dzf/lz,dzc/lz,visc,dt,l, &
           u,v,w,p,dudtrko,dvdtrko,dwdtrko,tauxo,tauyo,tauzo,up,vp,wp,f)
+# endif
       if(is_forced(1)) up(1:n(1),1:n(2),1:n(3)) = up(1:n(1),1:n(2),1:n(3)) + f(1)
       if(is_forced(2)) vp(1:n(1),1:n(2),1:n(3)) = vp(1:n(1),1:n(2),1:n(3)) + f(2)
       if(is_forced(3)) wp(1:n(1),1:n(2),1:n(3)) = wp(1:n(1),1:n(2),1:n(3)) + f(3)
@@ -332,6 +338,8 @@ program cans
       if(myid.eq.0) print*, dt12av/(1.*product(dims)),dt12min,dt12max
 #endif
   enddo
+
+  call cpu_time(c_time2)
   !
   ! clear ffts
   !
@@ -345,6 +353,7 @@ program cans
   deallocate(ap,bp,cp)
   deallocate(dzc,dzf,zc,zf,dzci,dzfi)
   deallocate(rhsbp%x,rhsbp%y,rhsbp%z)
+  if(myid.eq.0.and.(.not.kill)) print*, 'cpu time: ', c_time2 - c_time1
   if(myid.eq.0.and.(.not.kill)) print*, '*** Fim ***'
   call decomp_2d_finalize
   call MPI_FINALIZE(ierr)

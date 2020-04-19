@@ -4,7 +4,7 @@ module mod_bound
   use mod_types
   implicit none
   private
-  public boundp,bounduvw,updt_rhs_b
+  public boundp,bounduvw,updt_rhs_b, updthalo
   contains
   subroutine bounduvw(cbc,n,bc,isoutflow,dl,dzc,dzf,u,v,w)
     !
@@ -351,7 +351,7 @@ module mod_bound
     end select
     return
   end subroutine outflow
-  !
+  
   subroutine inflow(n,idir,dl,dzf,vel2d,u,v,w)
     implicit none
     integer, intent(in), dimension(3) :: n
